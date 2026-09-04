@@ -1,0 +1,32 @@
+id: aneel-brazil
+description: |
+  Official Brazilian electrical-energy and regulatory sources maintained by ANEEL.
+mode: preferred
+
+trusted_domains:
+  - domain: dadosabertos.aneel.gov.br
+    description: ANEEL open-data portal and official dataset catalog
+  - domain: www.gov.br
+    path_prefix: /aneel
+    description: ANEEL institutional pages, regulations, manuals, and procedures
+  - domain: www2.aneel.gov.br
+    description: ANEEL legacy regulatory and document systems
+
+sources:
+  - id: aneel-open-data-organization
+    url: https://dadosabertos.aneel.gov.br/organization/agencia-nacional-de-energia-eletrica
+    description: |
+      Official discovery hub for ANEEL datasets, groups, formats, and topic tags
+    always_include: true
+
+  - id: aneel-bdgd
+    url: https://dadosabertos.aneel.gov.br/dataset/base-de-dados-geografica-da-distribuidora-bdgd
+    description: |
+      Official BDGD dataset page with links to SIG-R, PRODIST, and BDGD documentation
+    topics: [bdgd, sig-r, prodist, geographic-data]
+
+instructions:
+  - Resolve ambiguous acronyms and regulation numbers in the Brazilian electrical-sector context.
+  - Prefer primary ANEEL regulations, manuals, datasets, and current institutional pages.
+  - Use the organization portal to discover relevant material; do not treat its landing page as the answer.
+  - Verify publication date, amendments, revocation, and current regulatory status when applicable.

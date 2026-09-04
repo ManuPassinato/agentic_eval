@@ -1,0 +1,13 @@
+# Reference values consumed by configs/run.example.yaml.
+# The runner translates this policy into one native opencode.json per worker.
+name: opencode
+mode: managed
+binary: opencode
+version: "1.18.21"
+workers: 1
+host: 127.0.0.1
+startup_timeout_seconds: 30
+shutdown_timeout_seconds: 5
+tool_policy:
+  allow: [websearch, webfetch]
+  deny: [bash, edit, write, read, glob, grep]

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentic-eval"
+version = "0.1.0"
+description = "Harness-neutral, trace-first evaluation for web-search QA agents"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "httpx",
+  "pydantic",
+  "PyYAML",
+  "typer",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+]
+
+[project.scripts]
+agentic-eval = "agentic_eval.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_eval"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
