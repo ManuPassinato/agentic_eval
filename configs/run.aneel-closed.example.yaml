@@ -1,0 +1,54 @@
+name: aneel-closed
+
+dataset:
+  path: ../examples/aneel_closed_smoke.jsonl
+
+model:
+  provider_id: vllm
+  model_id: Qwen/Qwen3-0.6B
+  base_url: ${VLLM_BASE_URL:-http://127.0.0.1:8080/v1}
+  api_key: ${VLLM_API_KEY:-not-required}
+  context_limit: 20480
+  output_limit: 2048
+  request_timeout_seconds: 120
+  chunk_timeout_seconds: 30
+
+environment:
+  kind: aneel_corpus
+  database_path: ../data/processed/aneel-corpus.sqlite3
+  manifest_path: ../data/processed/aneel-corpus.manifest.json
+  server_name: aneel
+  max_tool_steps: 10
+
+harness:
+  name: opencode
+  mode: managed
+  binary: ${OPENCODE_BIN:-opencode}
+  version: "1.18.21"
+  workers: 1
+  tool_policy:
+    allow: [aneel_*]
+    deny: [websearch, webfetch, bash, edit, write, read, glob, grep]
+
+task:
+  system_prompt: |
+    Responda em português usando exclusivamente o corpus local da ANEEL.
+    Consulte as ferramentas ANEEL antes de responder. Não use conhecimento externo.
+    Cada família documental possui ferramentas próprias: search_<familia> para busca
+    textual, get_<familia> para obter um ato por número e ano, e list_<familia> para
+    filtrar metadados. O get já retorna o primeiro trecho do documento; use
+    get_aneel_document apenas para continuar a leitura a partir de next_offset.
+    Finalize chamando finish com a resposta e os document_id que sustentam a
+    conclusão. Não invente fatos ausentes no corpus.
+  question_template: |
+    Pergunta: {question}
+  qualification_system_prompt: |
+    Você deve chamar uma ferramenta ANEEL e depois chamar finish com a resposta e
+    os IDs de evidência. Não responda usando conhecimento próprio.
+  qualification_question: |
+    Quantos documentos existem neste corpus? Use get_aneel_corpus_stats.
+
+output_dir: ../runs
+concurrency: 1
+timeout_seconds: 180
+infrastructure_retries: 0

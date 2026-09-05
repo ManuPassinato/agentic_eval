@@ -71,3 +71,41 @@ the source of truth for later deterministic or judge-based evaluation.
 
 See [docs/architecture.md](docs/architecture.md) for process isolation, failure
 semantics, and instructions for adding another harness.
+
+## Local ANEEL corpus
+
+An optional closed-corpus environment builds typed tools over the public
+`cemig-ceia/biblioteca-aneel-categorizado-4` Hugging Face dataset. The source is
+149,004 PDF-derived Portuguese documents, not a ready-made entity graph. The
+builder normalizes document/act metadata into SQLite and creates an FTS5/BM25
+knowledge index.
+
+```bash
+uv sync --extra corpus --extra dev
+uv run agentic-eval corpus-download
+uv run agentic-eval corpus-build
+uv run agentic-eval corpus-inspect data/processed/aneel-corpus.sqlite3 \
+  --query "Resolução Normativa 1000"
+
+OPENCODE_BIN=/root/.opencode/bin/opencode \
+  uv run agentic-eval doctor --config configs/run.aneel-closed.example.yaml
+uv run agentic-eval run --config configs/run.aneel-closed.example.yaml
+```
+
+The MCP environment exposes dedicated `search_*`, `get_*`, and `list_*` tools
+for each of the 29 document families, plus shared document pagination, corpus
+statistics, and evidence-backed `finish` (**90 tools total**). Closed-corpus
+runs deny web, shell, and file tools and enforce a ten-tool-call limit.
+
+This exhaustive surface mirrors corpus-specific legal benchmarks, but its 90
+schemas consume model context and make tool selection harder for small models.
+Use it to measure family routing explicitly rather than as a minimal production
+retrieval interface.
+
+Raw downloads and the generated database are stored under ignored `data/`.
+The pinned source revision and file/database hashes are recorded in manifests.
+The Hugging Face dataset declares no license; do not redistribute its raw or
+built content without a separate rights and LGPD review.
+
+See [docs/legalagentbench.md](docs/legalagentbench.md) for the benchmark
+comparison and corpus design.

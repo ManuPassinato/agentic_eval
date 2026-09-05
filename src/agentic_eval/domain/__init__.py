@@ -1,6 +1,7 @@
 from .models import (
     AttemptResult,
     DatasetSpec,
+    EnvironmentSpec,
     FailureKind,
     HarnessCapabilities,
     HarnessSpec,
@@ -19,6 +20,7 @@ from .models import (
 __all__ = [
     "AttemptResult",
     "DatasetSpec",
+    "EnvironmentSpec",
     "FailureKind",
     "HarnessCapabilities",
     "HarnessSpec",

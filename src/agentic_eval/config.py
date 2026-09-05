@@ -40,6 +40,14 @@ def load_run_spec(path: Path) -> RunSpec:
         spec.dataset.path = (path.parent / spec.dataset.path).resolve()
     if not spec.output_dir.is_absolute():
         spec.output_dir = (path.parent / spec.output_dir).resolve()
+    if spec.environment.database_path and not spec.environment.database_path.is_absolute():
+        spec.environment.database_path = (
+            path.parent / spec.environment.database_path
+        ).resolve()
+    if spec.environment.manifest_path and not spec.environment.manifest_path.is_absolute():
+        spec.environment.manifest_path = (
+            path.parent / spec.environment.manifest_path
+        ).resolve()
     if spec.task.source_profile_path:
         if not spec.task.source_profile_path.is_absolute():
             spec.task.source_profile_path = (

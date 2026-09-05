@@ -7,4 +7,6 @@ __pycache__/
 dist/
 build/
 runs/
+data/
 *.sqlite3
+examples/candidate_answers.jsonl

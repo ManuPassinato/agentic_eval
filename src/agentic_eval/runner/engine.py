@@ -47,6 +47,15 @@ class EvaluationRunner:
                 raise ValueError(
                     f"Dataset changed since run creation: expected {expected}, found {actual}"
                 )
+            corpus_manifest = manifest.get("corpus")
+            if corpus_manifest and self.spec.environment.manifest_path:
+                expected_corpus = corpus_manifest["sha256"]
+                actual_corpus = file_sha256(self.spec.environment.manifest_path)
+                if actual_corpus != expected_corpus:
+                    raise ValueError(
+                        "Corpus manifest changed since run creation: "
+                        f"expected {expected_corpus}, found {actual_corpus}"
+                    )
         else:
             if manifest_path.exists():
                 raise ValueError(f"Run directory already exists: {self.run_dir}")

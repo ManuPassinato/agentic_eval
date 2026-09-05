@@ -72,7 +72,11 @@ class FakeAdapter:
 
 async def test_runner_preserves_retry_attempts(monkeypatch, tmp_path):
     dataset = tmp_path / "questions.jsonl"
-    dataset.write_text('{"id":"q/1","question":"What?"}\n', encoding="utf-8")
+    dataset.write_text(
+        '{"id":"q/1","question":"What?","metadata":'
+        '{"key_answer":["done"],"key_middle":["Search."]}}\n',
+        encoding="utf-8",
+    )
     config = tmp_path / "run.yaml"
     config.write_text("test: true\n", encoding="utf-8")
     profile_path = tmp_path / "sources.yaml"
@@ -129,6 +133,8 @@ sources:
     jsonl_path, csv_path = export_run(run_dir)
     assert '"final_answer": "done"' in jsonl_path.read_text(encoding="utf-8")
     assert '"preferred_source_count": 1' in jsonl_path.read_text(encoding="utf-8")
+    assert '"success_rate": 1.0' in jsonl_path.read_text(encoding="utf-8")
+    assert '"progress_rate": 1.0' in jsonl_path.read_text(encoding="utf-8")
     assert csv_path.exists()
 
     resumed = await EvaluationRunner(

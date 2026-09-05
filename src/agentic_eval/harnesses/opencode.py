@@ -7,6 +7,7 @@ import re
 import secrets
 import shutil
 import socket
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +26,7 @@ from agentic_eval.domain import (
 from agentic_eval.harnesses.base import EventSink
 
 _URL_RE = re.compile(r"https?://[^\s<>\[\](){}\"']+")
+_DOCUMENT_ID_RE = re.compile(r"\baneel-[0-9a-f]{20}\b")
 
 
 def _now() -> datetime:
@@ -80,10 +82,58 @@ def _is_tool_event(event: TraceEvent) -> bool:
     return event.kind == "message.part.updated" and part.get("type") == "tool"
 
 
+def _tool_part(event: TraceEvent) -> dict[str, Any]:
+    part = (event.payload.get("properties") or {}).get("part") or {}
+    return part if isinstance(part, dict) and part.get("type") == "tool" else {}
+
+
+def _tool_name(event: TraceEvent) -> str | None:
+    part = _tool_part(event)
+    name = part.get("tool") or part.get("name")
+    return str(name) if name else None
+
+
+def _tool_call_id(event: TraceEvent) -> str | None:
+    part = _tool_part(event)
+    value = part.get("callID") or part.get("callId") or part.get("id")
+    return str(value) if value else None
+
+
+def _extract_document_ids(value: Any) -> set[str]:
+    if isinstance(value, str):
+        return set(_DOCUMENT_ID_RE.findall(value))
+    if isinstance(value, dict):
+        return set().union(*(_extract_document_ids(item) for item in value.values()), set())
+    if isinstance(value, list):
+        return set().union(*(_extract_document_ids(item) for item in value), set())
+    return set()
+
+
+def _extract_finish_answer(event: TraceEvent) -> str | None:
+    name = _tool_name(event)
+    if not name or not name.endswith("finish"):
+        return None
+    part = _tool_part(event)
+    state = part.get("state") if isinstance(part.get("state"), dict) else {}
+    for candidate in (state.get("output"), state.get("input"), part.get("output"), part.get("input")):
+        if isinstance(candidate, str):
+            try:
+                candidate = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+        if isinstance(candidate, dict) and candidate.get("answer"):
+            return str(candidate["answer"]).strip() or None
+    return None
+
+
 def _classify_runtime_error(error: str) -> FailureKind:
     lowered = error.lower()
+    if "tool step limit" in lowered:
+        return FailureKind.STEP_LIMIT
     if "malformed" in lowered and ("tool" in lowered or "json" in lowered):
         return FailureKind.MALFORMED_TOOL_CALL
+    if "aneel" in lowered and ("tool" in lowered or "mcp" in lowered or "corpus" in lowered):
+        return FailureKind.CORPUS_TOOL_FAILURE
     if any(tool in lowered for tool in ("websearch", "webfetch", "web search", "web fetch")):
         return FailureKind.WEB_TOOL_FAILURE
     if any(term in lowered for term in ("provider", "model", "completion", "context length")):
@@ -144,7 +194,7 @@ class OpenCodeWorker:
         permission = {"*": "deny"}
         permission.update({tool: "deny" for tool in self.run_spec.harness.tool_policy.deny})
         permission.update({tool: "allow" for tool in self.run_spec.harness.tool_policy.allow})
-        return {
+        config: dict[str, Any] = {
             "$schema": "https://opencode.ai/config.json",
             "model": f"{model.provider_id}/{model.model_id}",
             "small_model": f"{model.provider_id}/{model.model_id}",
@@ -172,6 +222,26 @@ class OpenCodeWorker:
                 }
             },
         }
+        environment = self.run_spec.environment
+        if environment.kind == "aneel_corpus":
+            command = [
+                sys.executable,
+                "-m",
+                "agentic_eval.environments.aneel.mcp_server",
+                "--db",
+                str(environment.database_path),
+            ]
+            for family in environment.families:
+                command.extend(["--family", family])
+            config["mcp"] = {
+                environment.server_name: {
+                    "type": "local",
+                    "command": command,
+                    "enabled": True,
+                    "timeout": 30_000,
+                }
+            }
+        return config
 
     async def start(self) -> None:
         try:
@@ -201,12 +271,15 @@ class OpenCodeWorker:
                         ),
                         "OPENCODE_CONFIG": str(config_path),
                         "OPENCODE_SERVER_PASSWORD": self.password,
-                        "OPENCODE_ENABLE_EXA": "1",
                         "XDG_CONFIG_HOME": str(self.root / "xdg-config"),
                         "XDG_DATA_HOME": str(self.root / "xdg-data"),
                         "XDG_CACHE_HOME": str(self.shared_cache),
                     }
                 )
+                if self.run_spec.environment.kind == "web":
+                    env["OPENCODE_ENABLE_EXA"] = "1"
+                else:
+                    env.pop("OPENCODE_ENABLE_EXA", None)
                 log_path = self.root / "opencode.log"
                 self._log_handle = log_path.open("ab")
                 self.process = await asyncio.create_subprocess_exec(
@@ -356,11 +429,34 @@ class OpenCodeWorker:
             tuple[str | None, dict[str, Any], list[str], FailureKind, str | None]
         ] | None = None
         observed_sources: set[str] = set()
+        observed_document_ids: set[str] = set()
+        seen_tool_calls: set[str] = set()
+        finish_answer: str | None = None
         timed_out = False
 
         async def capture(event: TraceEvent) -> None:
+            nonlocal finish_answer
             if _is_tool_event(event):
                 observed_sources.update(_extract_urls(event.payload))
+                observed_document_ids.update(_extract_document_ids(event.payload))
+                call_id = _tool_call_id(event) or json.dumps(
+                    _tool_part(event),
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=str,
+                )
+                if (
+                    self.run_spec.environment.kind == "aneel_corpus"
+                    and call_id not in seen_tool_calls
+                ):
+                    seen_tool_calls.add(call_id)
+                    if len(seen_tool_calls) > self.run_spec.environment.max_tool_steps:
+                        raise RuntimeError(
+                            "tool step limit exceeded: "
+                            f"{len(seen_tool_calls)} > "
+                            f"{self.run_spec.environment.max_tool_steps}"
+                        )
+                finish_answer = _extract_finish_answer(event) or finish_answer
             await event_sink(event)
 
         async def run_attempt() -> tuple[str | None, dict[str, Any], list[str], FailureKind, str | None]:
@@ -396,10 +492,25 @@ class OpenCodeWorker:
             await event_sink(
                 TraceEvent(kind="session.messages", session_id=session_id, payload={"data": messages})
             )
-            final_answer, usage = _extract_answer(messages)
+            assistant_answer, usage = _extract_answer(messages)
+            final_answer = finish_answer or assistant_answer
             failure = FailureKind.SUCCESS if final_answer else FailureKind.MISSING_ANSWER
-            sources = sorted(observed_sources.union(_extract_urls(final_answer or "")))
+            sources = sorted(
+                observed_sources
+                .union(observed_document_ids)
+                .union(_extract_urls(final_answer or ""))
+            )
             error = None if final_answer else "No assistant text found in completed session"
+            if (
+                self.run_spec.environment.kind == "aneel_corpus"
+                and case.id != "qualification"
+            ):
+                if not seen_tool_calls:
+                    failure = FailureKind.CORPUS_TOOL_FAILURE
+                    error = "Closed-corpus case completed without an ANEEL tool call"
+                elif finish_answer is None:
+                    failure = FailureKind.MISSING_ANSWER
+                    error = "Closed-corpus case completed without calling finish"
             return final_answer, usage, sources, failure, error
 
         try:
@@ -438,7 +549,11 @@ class OpenCodeWorker:
             failure = FailureKind.MODEL_ERROR if exc.response.status_code < 500 else FailureKind.HARNESS_CRASH
             error = f"HTTP {exc.response.status_code}: {body}"
         except RuntimeError as exc:
-            final_answer, usage, sources = None, {}, sorted(observed_sources)
+            final_answer, usage, sources = (
+                None,
+                {},
+                sorted(observed_sources.union(observed_document_ids)),
+            )
             error = str(exc)
             failure = _classify_runtime_error(error)
         except (httpx.HTTPError, OSError) as exc:
@@ -536,6 +651,20 @@ class OpenCodeAdapter:
     async def qualify(self, run_live_case: bool = True) -> dict[str, object]:
         version = await self._binary_version()
         vllm = await self._vllm_health()
+        corpus_summary: dict[str, Any] | None = None
+        if self.run_spec.environment.kind == "aneel_corpus":
+            from agentic_eval.environments.aneel import AneelCorpus
+
+            database_path = self.run_spec.environment.database_path
+            if database_path is None:
+                raise RuntimeError("ANEEL corpus database path is not configured")
+            with AneelCorpus(database_path) as corpus:
+                stats = corpus.stats()
+            corpus_summary = {
+                "database": str(database_path),
+                "document_count": stats["document_count"],
+                "revision": stats.get("revision"),
+            }
         worker = await self.create_worker(-1)
         try:
             health = await worker.health()
@@ -544,6 +673,8 @@ class OpenCodeAdapter:
                 "opencode_health": health,
                 "vllm": vllm,
             }
+            if corpus_summary is not None:
+                result["corpus"] = corpus_summary
             if run_live_case:
                 events: list[TraceEvent] = []
 
@@ -564,6 +695,13 @@ class OpenCodeAdapter:
                     )
                 if not any(_is_tool_event(event) for event in events):
                     raise RuntimeError("Live qualification completed without an observable tool event")
+                if self.run_spec.environment.kind == "aneel_corpus" and not any(
+                    "aneel" in (_tool_name(event) or "").lower()
+                    for event in events
+                ):
+                    raise RuntimeError(
+                        "Corpus qualification completed without an observable ANEEL tool event"
+                    )
                 result["live_case"] = attempt.model_dump(mode="json")
             return result
         finally:

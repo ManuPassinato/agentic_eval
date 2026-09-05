@@ -6,6 +6,27 @@ import os
 from pathlib import Path
 
 from agentic_eval.runner.ledger import RunLedger
+from agentic_eval.scoring import keyword_scores
+
+
+def _case_metadata(run_dir: Path) -> dict[str, dict[str, object]]:
+    manifest_path = run_dir / "manifest.json"
+    dataset_path = run_dir / "dataset.jsonl"
+    if not manifest_path.is_file() or not dataset_path.is_file():
+        return {}
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    dataset_spec = (manifest.get("resolved_config") or {}).get("dataset") or {}
+    id_field = dataset_spec.get("id_field", "id")
+    metadata_field = dataset_spec.get("metadata_field", "metadata")
+    cases: dict[str, dict[str, object]] = {}
+    with dataset_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            metadata = record.get(metadata_field, {}) if metadata_field else {}
+            cases[str(record[id_field])] = metadata if isinstance(metadata, dict) else {}
+    return cases
 
 
 def export_run(run_dir: Path) -> tuple[Path, Path]:
@@ -15,6 +36,7 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
     finally:
         ledger.close()
 
+    metadata_by_case = _case_metadata(run_dir)
     records: list[dict[str, object]] = []
     for row in rows:
         result: dict[str, object] = {}
@@ -26,6 +48,12 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
         preferred_matches = [
             match for match in source_matches if isinstance(match, dict) and match.get("preferred")
         ]
+        trace_path = run_dir / row["trace_path"] if row["trace_path"] else None
+        scores = keyword_scores(
+            result.get("final_answer") if isinstance(result.get("final_answer"), str) else None,
+            metadata_by_case.get(str(row["case_id"]), {}),
+            trace_path=trace_path,
+        )
         records.append(
             {
                 "case_id": row["case_id"],
@@ -44,6 +72,7 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
                         if match.get("matched_domain")
                     }
                 ),
+                **scores,
                 "duration_seconds": row["duration_seconds"],
                 "worker_id": row["worker_id"],
                 "error": row["error"],
@@ -74,6 +103,10 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
         "source_matches",
         "preferred_source_count",
         "preferred_domains",
+        "success_rate",
+        "progress_rate",
+        "matched_key_answer",
+        "matched_key_middle",
         "duration_seconds",
         "worker_id",
         "error",
@@ -93,6 +126,12 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
                     ),
                     "preferred_domains": json.dumps(
                         record["preferred_domains"], ensure_ascii=False
+                    ),
+                    "matched_key_answer": json.dumps(
+                        record["matched_key_answer"], ensure_ascii=False
+                    ),
+                    "matched_key_middle": json.dumps(
+                        record["matched_key_middle"], ensure_ascii=False
                     ),
                 }
             )

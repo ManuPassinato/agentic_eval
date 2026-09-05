@@ -94,12 +94,23 @@ def initialize_run_directory(
             "snapshot": profile_copy.name,
             "sha256": file_sha256(spec.task.source_profile_path),
         }
+    corpus_manifest = None
+    if spec.environment.manifest_path:
+        corpus_manifest_copy = run_dir / "corpus-manifest.json"
+        if not corpus_manifest_copy.exists():
+            shutil.copy2(spec.environment.manifest_path, corpus_manifest_copy)
+        corpus_manifest = {
+            "source": str(spec.environment.manifest_path),
+            "snapshot": corpus_manifest_copy.name,
+            "sha256": file_sha256(spec.environment.manifest_path),
+        }
     manifest = {
         "run_id": run_id,
         "config_source": str(config_path.resolve()),
         "dataset_source": str(spec.dataset.path),
         "dataset_sha256": file_sha256(spec.dataset.path),
         "source_profile": source_profile_manifest,
+        "corpus": corpus_manifest,
         "resolved_config": redact(spec.model_dump(mode="json")),
     }
     atomic_write_json(run_dir / "manifest.json", manifest)

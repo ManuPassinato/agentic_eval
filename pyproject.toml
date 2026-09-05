@@ -16,9 +16,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+corpus = [
+  "huggingface-hub",
+  "mcp<2",
+  "pyarrow",
+]
 dev = [
   "pytest",
   "pytest-asyncio",
+  "ruff",
 ]
 
 [project.scripts]

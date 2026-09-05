@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 
 
 def utc_now() -> datetime:
@@ -21,6 +21,8 @@ class FailureKind(str, Enum):
     MODEL_ERROR = "model_error"
     MALFORMED_TOOL_CALL = "malformed_tool_call"
     WEB_TOOL_FAILURE = "web_tool_failure"
+    CORPUS_TOOL_FAILURE = "corpus_tool_failure"
+    STEP_LIMIT = "step_limit"
     MISSING_ANSWER = "missing_answer"
     CANCELLATION = "cancellation"
 
@@ -90,6 +92,31 @@ class HarnessSpec(BaseModel):
         if value not in {"managed", "attach"}:
             raise ValueError("mode must be 'managed' or 'attach'")
         return value
+
+
+class EnvironmentSpec(BaseModel):
+    kind: Literal["web", "aneel_corpus"] = "web"
+    database_path: Path | None = None
+    manifest_path: Path | None = None
+    server_name: str = "aneel"
+    max_tool_steps: int = Field(default=10, ge=1)
+    families: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def corpus_paths_required(self) -> EnvironmentSpec:
+        if self.kind == "aneel_corpus" and self.database_path is None:
+            raise ValueError("database_path is required for an aneel_corpus environment")
+        if self.kind == "web" and self.families:
+            raise ValueError("families can only be selected for an aneel_corpus environment")
+        if self.families:
+            from agentic_eval.environments.aneel.families import FAMILY_BY_SLUG
+
+            if len(set(self.families)) != len(self.families):
+                raise ValueError("environment families must be unique")
+            unknown = sorted(set(self.families) - set(FAMILY_BY_SLUG))
+            if unknown:
+                raise ValueError(f"unknown ANEEL family slugs: {unknown}")
+        return self
 
 
 class TrustedDomain(BaseModel):
@@ -182,6 +209,7 @@ class RunSpec(BaseModel):
     dataset: DatasetSpec
     model: ModelSpec
     harness: HarnessSpec = Field(default_factory=HarnessSpec)
+    environment: EnvironmentSpec = Field(default_factory=EnvironmentSpec)
     task: TaskSpec
     output_dir: Path = Path("runs")
     concurrency: int = 1

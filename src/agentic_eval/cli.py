@@ -11,6 +11,9 @@ from typing import Annotated
 import typer
 
 from agentic_eval.config import load_run_spec
+from agentic_eval.environments.aneel.build import build_corpus
+from agentic_eval.environments.aneel.corpus import AneelCorpus
+from agentic_eval.environments.aneel.download import download_dataset
 from agentic_eval.harnesses import create_adapter
 from agentic_eval.runner import EvaluationRunner
 from agentic_eval.runner.exports import export_run
@@ -27,14 +30,77 @@ def _run_id(name: str) -> str:
     return f"{name}-{timestamp}-{uuid.uuid4().hex[:8]}"
 
 
+@app.command("corpus-download")
+def corpus_download(
+    output: Annotated[
+        Path,
+        typer.Option(help="Ignored directory for the pinned Hugging Face snapshot."),
+    ] = Path("data/raw/biblioteca-aneel-categorizado-4"),
+) -> None:
+    """Download and hash the pinned public ANEEL dataset snapshot."""
+    try:
+        result = download_dataset(output)
+    except Exception as exc:
+        typer.echo(f"Corpus download failed: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+@app.command("corpus-build")
+def corpus_build(
+    raw_dir: Annotated[
+        Path,
+        typer.Option(exists=True, file_okay=False, readable=True),
+    ] = Path("data/raw/biblioteca-aneel-categorizado-4"),
+    output: Annotated[
+        Path,
+        typer.Option(help="Output SQLite corpus database."),
+    ] = Path("data/processed/aneel-corpus.sqlite3"),
+    limit: Annotated[
+        int | None,
+        typer.Option(min=1, help="Build only N rows for development."),
+    ] = None,
+) -> None:
+    """Build normalized metadata and an FTS5 index from downloaded Parquet."""
+    try:
+        result = build_corpus(raw_dir, output, limit=limit)
+    except Exception as exc:
+        typer.echo(f"Corpus build failed: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+@app.command("corpus-inspect")
+def corpus_inspect(
+    database: Annotated[
+        Path,
+        typer.Argument(exists=True, dir_okay=False, readable=True),
+    ],
+    query: Annotated[
+        str | None,
+        typer.Option(help="Optional full-text query to sample."),
+    ] = None,
+) -> None:
+    """Inspect corpus distributions and optionally run a sample search."""
+    try:
+        with AneelCorpus(database) as corpus:
+            result: dict[str, object] = {"stats": corpus.stats()}
+            if query:
+                result["results"] = corpus.search(query)
+    except Exception as exc:
+        typer.echo(f"Corpus inspection failed: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(json.dumps(result, indent=2, ensure_ascii=False))
+
+
 @app.command()
 def doctor(
     config: Annotated[Path, typer.Option(exists=True, dir_okay=False, readable=True)],
     skip_live_case: Annotated[
-        bool, typer.Option(help="Skip the web-search qualification case.")
+        bool, typer.Option(help="Skip the environment qualification case.")
     ] = False,
 ) -> None:
-    """Validate OpenCode, vLLM, web tools, and cancellation prerequisites."""
+    """Validate OpenCode, vLLM, environment tools, and cancellation prerequisites."""
     spec = load_run_spec(config)
 
     async def check() -> dict[str, object]:

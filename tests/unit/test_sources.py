@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from agentic_eval.config import load_run_spec
+from agentic_eval.datasets import load_cases
 from agentic_eval.domain import QuestionCase
 from agentic_eval.sources import (
     classify_sources,
@@ -67,3 +68,32 @@ def test_live_config_loads_profile_and_keeps_qualification_neutral():
     assert "agencia-nacional-de-energia-eletrica" in prompt
     assert prompt.endswith("Pergunta: REM 1000")
     assert "ANEEL" not in spec.task.render_qualification()
+
+
+def test_closed_corpus_config_resolves_local_paths_and_denies_web():
+    spec = load_run_spec(PROJECT_ROOT / "configs" / "run.aneel-closed.example.yaml")
+
+    assert spec.environment.kind == "aneel_corpus"
+    assert spec.environment.database_path == (
+        PROJECT_ROOT / "data" / "processed" / "aneel-corpus.sqlite3"
+    )
+    assert spec.environment.max_tool_steps == 10
+    assert "aneel_*" in spec.harness.tool_policy.allow
+    assert "websearch" in spec.harness.tool_policy.deny
+    assert spec.task.source_profile is None
+
+
+def test_public_tasks_config_loads_only_safe_question_fields():
+    spec = load_run_spec(PROJECT_ROOT / "configs" / "run.public-tasks-closed.yaml")
+    cases = load_cases(spec.dataset)
+
+    assert len(cases) == 30
+    assert spec.dataset.id_field == "task_id"
+    assert spec.dataset.question_field == "instruction"
+    assert spec.dataset.reference_answer_field is None
+    assert spec.dataset.tags_field is None
+    assert spec.dataset.metadata_field is None
+    assert spec.dataset.timeout_field is None
+    assert spec.environment.families == ["resolucao_normativa"]
+    assert all(case.reference_answer is None for case in cases)
+    assert all(case.tags == [] and case.metadata == {} for case in cases)

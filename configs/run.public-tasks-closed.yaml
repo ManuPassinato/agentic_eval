@@ -1,0 +1,60 @@
+name: aneel-public-tasks-closed
+
+dataset:
+  path: ../examples/public_tasks.jsonl
+  id_field: task_id
+  question_field: instruction
+  reference_answer_field: null
+  tags_field: null
+  metadata_field: null
+  timeout_field: null
+
+model:
+  provider_id: vllm
+  model_id: Qwen/Qwen3-0.6B
+  base_url: ${VLLM_BASE_URL:-http://127.0.0.1:8080/v1}
+  api_key: ${VLLM_API_KEY:-not-required}
+  context_limit: 20480
+  output_limit: 2048
+  request_timeout_seconds: 240
+  chunk_timeout_seconds: 60
+
+environment:
+  kind: aneel_corpus
+  database_path: ../data/processed/aneel-corpus.sqlite3
+  manifest_path: ../data/processed/aneel-corpus.manifest.json
+  server_name: aneel
+  max_tool_steps: 10
+  families: [resolucao_normativa]
+
+harness:
+  name: opencode
+  mode: managed
+  binary: ${OPENCODE_BIN:-opencode}
+  version: "1.18.21"
+  workers: 1
+  tool_policy:
+    allow: [aneel_*]
+    deny: [websearch, webfetch, bash, edit, write, read, glob, grep]
+
+task:
+  system_prompt: |
+    Use exclusivamente as ferramentas ANEEL; não use conhecimento externo.
+    Sua PRIMEIRA ação deve ser chamar aneel_search_resolucao_normativa com uma
+    consulta curta extraída da pergunta. Não escreva texto antes dessa chamada.
+    Examine os resultados e use aneel_get_aneel_document para ler continuações
+    quando necessário. Sua ÚLTIMA ação deve ser chamar aneel_finish com a
+    resposta completa em português e todos os document_id de evidência. É
+    proibido responder diretamente sem aneel_finish. Não invente fatos.
+  question_template: |
+    Pergunta: {question}
+  qualification_system_prompt: |
+    Execute exatamente uma chamada da ferramenta aneel_get_aneel_corpus_stats.
+    Não escreva explicações antes da chamada.
+  qualification_question: |
+    Chame agora aneel_get_aneel_corpus_stats, sem argumentos.
+
+output_dir: ../runs
+concurrency: 1
+timeout_seconds: 300
+infrastructure_retries: 0

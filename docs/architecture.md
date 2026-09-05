@@ -34,6 +34,37 @@ The initial policy denies every tool and then allows only `websearch` and
 denied. Web content is still untrusted and can contain prompt injection, so the
 shared task prompt tells the model to treat it only as evidence.
 
+## Closed-corpus environments
+
+`RunSpec.environment` selects either the default live-web environment or a
+local corpus. The ANEEL corpus is built offline from pinned Parquet shards into
+a read-only SQLite metadata table and FTS5 index. Each OpenCode worker starts
+the same local MCP server command against that immutable database:
+
+```mermaid
+flowchart LR
+    Parquet[ANEELParquet] --> Builder[CorpusBuilder]
+    Builder --> SQLite[SQLiteAndFTS5]
+    SQLite --> MCP[ANEELMCP]
+    MCP --> OpenCode[OpenCodeWorker]
+    OpenCode --> Trace[NormalizedTrace]
+```
+
+Corpus runs invert the web policy: web, shell, repository reads, and writes
+remain denied while only MCP tools prefixed `aneel_` are allowed. The adapter
+counts distinct tool-call IDs and fails the attempt after the configured limit.
+Document IDs observed in tool payloads are retained as result provenance.
+
+The ANEEL MCP server generates three operations for every registered document
+family: `search_<family>`, `get_<family>`, and `list_<family>`. The family is
+bound by the server rather than supplied by the model. With 29 families and
+three shared tools (`get_aneel_document`, `get_aneel_corpus_stats`, `finish`),
+the model sees 90 tools. The explicit split makes family selection measurable,
+at the cost of a larger tool schema and harder routing for small models.
+
+Run manifests copy the small corpus build manifest and its hash, not the
+multi-gigabyte database. Resume rejects a changed corpus manifest.
+
 ## Preferred source profiles
 
 Source profiles are task configuration, not harness skills. The runner renders
