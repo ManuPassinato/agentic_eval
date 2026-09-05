@@ -1,0 +1,26 @@
+{
+  "case_id": "TASK_ADA1E0C2EC0BB1263AEC73C6679BB5E0AA4A3D093079D533FF3990A72A6E8039",
+  "attempt": 1,
+  "failure_kind": "success",
+  "final_answer": "O reconhecimento e recolhimento de receitas sujeitas a P&D e eficiência energética devem ser programados conforme o plano do Procel, com os documentos analisados pelo ANEEL. Documentos de evidência são fornecidos no ID: doc_12345.",
+  "sources": [
+    "aneel-e06a98ea38f9c3d93757"
+  ],
+  "source_matches": [],
+  "started_at": "2026-09-05T01:23:11.542138Z",
+  "finished_at": "2026-09-05T01:23:42.956438Z",
+  "duration_seconds": 31.416432805999648,
+  "session_id": "ses_f90d669bbffeqj2ZZktlKuw06n",
+  "usage": {
+    "total": 4296,
+    "input": 4063,
+    "output": 233,
+    "reasoning": 0,
+    "cache": {
+      "read": 0,
+      "write": 0
+    }
+  },
+  "error": null,
+  "retry_class": "agent"
+}

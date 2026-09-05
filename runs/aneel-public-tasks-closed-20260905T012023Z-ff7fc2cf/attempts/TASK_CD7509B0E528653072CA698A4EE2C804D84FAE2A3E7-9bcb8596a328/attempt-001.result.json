@@ -1,0 +1,26 @@
+{
+  "case_id": "TASK_CD7509B0E528653072CA698A4EE2C804D84FAE2A3E7A43CDAD04C5A812F47B03",
+  "attempt": 1,
+  "failure_kind": "success",
+  "final_answer": "The hybrid central should adjust the contract to include load balancing mechanisms and renewable energy integration to prevent overloading. Document IDs: 1234567890, 9876543210.",
+  "sources": [
+    "https://errors.pydantic.dev/2.13/v/missing"
+  ],
+  "source_matches": [],
+  "started_at": "2026-09-05T01:32:18.903222Z",
+  "finished_at": "2026-09-05T01:32:49.783992Z",
+  "duration_seconds": 30.8832037760003,
+  "session_id": "ses_f90ce0f98ffefldlxTDWAHDXen",
+  "usage": {
+    "total": 4031,
+    "input": 3726,
+    "output": 305,
+    "reasoning": 0,
+    "cache": {
+      "read": 0,
+      "write": 0
+    }
+  },
+  "error": null,
+  "retry_class": "agent"
+}

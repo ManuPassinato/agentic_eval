@@ -1,0 +1,30 @@
+{
+  "case_id": "TASK_DF486FDD1622EAB72BDA136BD140C47F96215F34D06D085D537F958E8F71F28D",
+  "attempt": 1,
+  "failure_kind": "success",
+  "final_answer": "A distribuidora deve garantir que o benefício seja mantido, normalizando o atendimento digital para as faturas impressas, utilizando os documentos ANEEL para validar a continuação da operação.",
+  "sources": [
+    "aneel-5bf678abcc446a87cc40",
+    "aneel-71ab38258fb086a4f142",
+    "aneel-9684d963ca5ed03e0ea9",
+    "aneel-a94783a6a83e76f2c8fe",
+    "aneel-ef264c3c27ebad393628"
+  ],
+  "source_matches": [],
+  "started_at": "2026-09-05T01:27:02.576333Z",
+  "finished_at": "2026-09-05T01:27:57.515734Z",
+  "duration_seconds": 54.94309975599754,
+  "session_id": "ses_f90d2e342ffeUgiB3WIh7sKT3H",
+  "usage": {
+    "total": 5885,
+    "input": 5596,
+    "output": 289,
+    "reasoning": 0,
+    "cache": {
+      "read": 0,
+      "write": 0
+    }
+  },
+  "error": null,
+  "retry_class": "agent"
+}
