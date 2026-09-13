@@ -32,3 +32,15 @@ def test_returns_none_when_no_gold_keywords():
     scores = keyword_scores("answer", {})
     assert scores["success_rate"] is None
     assert scores["progress_rate"] is None
+
+
+def test_unwraps_keyword_objects():
+    scores = keyword_scores(
+        "O CCEI deve ser registrado na CCEE.",
+        {
+            "key_answer": [{"keyword": "CCEI"}, {"keyword": "CCEE"}],
+            "key_middle": [{"keyword": "ren2006247"}],
+        },
+    )
+    assert scores["success_rate"] == 1.0
+    assert scores["matched_key_answer"] == ["CCEI", "CCEE"]

@@ -70,7 +70,8 @@ No answer scoring is performed in v1. Raw traces and plain final answers remain
 the source of truth for later deterministic or judge-based evaluation.
 
 See [docs/architecture.md](docs/architecture.md) for process isolation, failure
-semantics, and instructions for adding another harness.
+semantics, and instructions for adding another harness. Comparable notes on
+OpenCode, Codex CLI, and Claude Code live under `docs/harness-*.md`.
 
 ## Local ANEEL corpus
 

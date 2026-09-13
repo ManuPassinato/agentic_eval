@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 from agentic_eval.config import redact
-from agentic_eval.datasets import file_sha256
+from agentic_eval.datasets import agent_visible_record, file_sha256
 from agentic_eval.domain import AttemptResult, RunSpec, TraceEvent
 
 
@@ -82,7 +82,21 @@ def initialize_run_directory(
     (run_dir / "runtime").mkdir(exist_ok=True)
     dataset_copy = run_dir / "dataset.jsonl"
     if not dataset_copy.exists():
-        shutil.copy2(spec.dataset.path, dataset_copy)
+        with spec.dataset.path.open("r", encoding="utf-8") as source, dataset_copy.open(
+            "w", encoding="utf-8"
+        ) as destination:
+            for line in source:
+                if not line.strip():
+                    continue
+                record = json.loads(line)
+                destination.write(
+                    json.dumps(
+                        agent_visible_record(record, spec.dataset),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
     source_profile_manifest = None
     if spec.task.source_profile_path:
         profile_copy = run_dir / "source-profile.yaml"

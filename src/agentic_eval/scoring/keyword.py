@@ -16,13 +16,19 @@ def normalize_text(value: str) -> str:
     return " ".join(without_marks.split())
 
 
+def _keyword_text(item: Any) -> str:
+    if isinstance(item, dict):
+        item = item.get("keyword", "")
+    return str(item).strip()
+
+
 def _keywords(metadata: dict[str, Any], key: str) -> list[str]:
     value = metadata.get(key, [])
     if isinstance(value, str):
         value = [value]
     if not isinstance(value, list):
         return []
-    return [str(item) for item in value if str(item).strip()]
+    return [text for item in value if (text := _keyword_text(item))]
 
 
 def _matched(keywords: list[str], text: str) -> list[str]:

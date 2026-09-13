@@ -1,9 +1,9 @@
 name: aneel-public-tasks-closed
 
 dataset:
-  path: ../examples/public_tasks.jsonl
+  path: ../examples/benchmark.jsonl
   id_field: task_id
-  question_field: instruction
+  question_field: question
   reference_answer_field: null
   tags_field: null
   metadata_field: null

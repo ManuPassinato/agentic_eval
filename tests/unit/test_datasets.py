@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from agentic_eval.datasets import load_cases, select_cases
-from agentic_eval.domain import DatasetSpec
+from agentic_eval.datasets import agent_visible_record, load_cases, scoring_metadata, select_cases
+from agentic_eval.domain import DatasetSpec, TaskSpec
 
 
 def test_loads_configurable_jsonl_fields(tmp_path):
@@ -45,3 +45,56 @@ def test_shards_are_stable_and_disjoint(tmp_path):
     second = select_cases(cases, case_ids=set(), tags=set(), shard_index=1, shard_count=2)
     assert {case.id for case in first}.isdisjoint(case.id for case in second)
     assert len(first) + len(second) == len(cases)
+
+
+def test_fused_answer_columns_are_not_loaded_or_rendered(tmp_path):
+    path = tmp_path / "benchmark.jsonl"
+    record = {
+        "task_id": "TASK_1",
+        "instruction": "Como regularizar a fatura?",
+        "key_answer": ["quinze dias"],
+        "key_middle": ["ren2006247"],
+        "candidate_response": "SECRET GOLD ANSWER",
+        "citations": [{"evidence_text": "SECRET EVIDENCE"}],
+    }
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    spec = DatasetSpec(
+        path=path,
+        id_field="task_id",
+        question_field="instruction",
+        reference_answer_field=None,
+        tags_field=None,
+        metadata_field=None,
+        timeout_field=None,
+    )
+    case = load_cases(spec)[0]
+    prompt = TaskSpec(system_prompt="Use as ferramentas ANEEL.").render(
+        case, include_source_profile=False
+    )
+
+    assert case.question == "Como regularizar a fatura?"
+    assert case.reference_answer is None
+    assert case.metadata == {}
+    assert agent_visible_record(record, spec) == {
+        "task_id": "TASK_1",
+        "instruction": "Como regularizar a fatura?",
+    }
+    assert scoring_metadata(record, spec.metadata_field) == {
+        "key_answer": ["quinze dias"],
+        "key_middle": ["ren2006247"],
+    }
+    assert scoring_metadata(
+        {
+            "answer_keywords": [{"keyword": "quinze dias"}],
+            "middle_keywords": [{"keyword": "ren2006247"}],
+        },
+        None,
+    ) == {
+        "key_answer": [{"keyword": "quinze dias"}],
+        "key_middle": [{"keyword": "ren2006247"}],
+    }
+    assert "Como regularizar a fatura?" in prompt
+    assert "SECRET GOLD ANSWER" not in prompt
+    assert "SECRET EVIDENCE" not in prompt
+    assert "quinze dias" not in prompt
+    assert "ren2006247" not in prompt

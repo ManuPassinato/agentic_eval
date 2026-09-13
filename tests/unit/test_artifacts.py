@@ -60,3 +60,43 @@ def test_run_snapshots_small_corpus_manifest_not_database(tmp_path):
     assert manifest["corpus"]["snapshot"] == "corpus-manifest.json"
     assert (run_dir / "corpus-manifest.json").exists()
     assert not (run_dir / database.name).exists()
+
+
+def test_run_dataset_snapshot_hides_answer_columns(tmp_path):
+    dataset = tmp_path / "benchmark.jsonl"
+    dataset.write_text(
+        json.dumps(
+            {
+                "task_id": "TASK_1",
+                "instruction": "Como regularizar a fatura?",
+                "key_answer": ["quinze dias"],
+                "candidate_response": "SECRET GOLD ANSWER",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    config = tmp_path / "run.yaml"
+    config.write_text("test: true\n", encoding="utf-8")
+    spec = RunSpec(
+        dataset=DatasetSpec(
+            path=dataset,
+            id_field="task_id",
+            question_field="instruction",
+            reference_answer_field=None,
+            metadata_field=None,
+        ),
+        model=ModelSpec(model_id="model", base_url="http://vllm/v1"),
+        task=TaskSpec(system_prompt="Use corpus."),
+    )
+    run_dir = tmp_path / "run"
+
+    initialize_run_directory(run_dir, spec, config, run_id="test")
+
+    snapshot = json.loads((run_dir / "dataset.jsonl").read_text(encoding="utf-8"))
+    assert snapshot == {
+        "task_id": "TASK_1",
+        "instruction": "Como regularizar a fatura?",
+    }
+    original = json.loads(dataset.read_text(encoding="utf-8"))
+    assert original["candidate_response"] == "SECRET GOLD ANSWER"

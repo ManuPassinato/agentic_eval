@@ -21,6 +21,42 @@ def _optional(record: dict[str, Any], field: str | None, default: Any = None) ->
     return record.get(field, default) if field else default
 
 
+def agent_visible_fields(spec: DatasetSpec) -> list[str]:
+    fields = [spec.id_field, spec.question_field]
+    for field in (spec.tags_field, spec.timeout_field):
+        if field:
+            fields.append(field)
+    return fields
+
+
+def agent_visible_record(record: dict[str, Any], spec: DatasetSpec) -> dict[str, Any]:
+    return {
+        field: record[field]
+        for field in agent_visible_fields(spec)
+        if field in record
+    }
+
+
+_SCORING_KEY_ALIASES = {
+    "key_answer": ("key_answer", "answer_keywords"),
+    "key_middle": ("key_middle", "middle_keywords"),
+}
+
+
+def scoring_metadata(record: dict[str, Any], metadata_field: str | None) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    if metadata_field:
+        value = record.get(metadata_field, {})
+        if isinstance(value, dict):
+            metadata.update(value)
+    for dest, sources in _SCORING_KEY_ALIASES.items():
+        for source in sources:
+            if source in record:
+                metadata[dest] = record[source]
+                break
+    return metadata
+
+
 def load_cases(spec: DatasetSpec) -> list[QuestionCase]:
     cases: list[QuestionCase] = []
     seen: set[str] = set()

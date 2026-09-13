@@ -89,7 +89,7 @@ def test_public_tasks_config_loads_only_safe_question_fields():
 
     assert len(cases) == 30
     assert spec.dataset.id_field == "task_id"
-    assert spec.dataset.question_field == "instruction"
+    assert spec.dataset.question_field == "question"
     assert spec.dataset.reference_answer_field is None
     assert spec.dataset.tags_field is None
     assert spec.dataset.metadata_field is None
@@ -97,3 +97,9 @@ def test_public_tasks_config_loads_only_safe_question_fields():
     assert spec.environment.families == ["resolucao_normativa"]
     assert all(case.reference_answer is None for case in cases)
     assert all(case.tags == [] and case.metadata == {} for case in cases)
+    prompt = spec.task.render(cases[0], include_source_profile=False)
+    assert cases[0].question in prompt
+    assert "candidate_response" not in prompt
+    assert "answer_keywords" not in prompt
+    assert "key_answer" not in prompt
+    assert prompt.endswith(f"Pergunta: {cases[0].question}")

@@ -127,6 +127,9 @@ sources:
     final_result = json.loads(results[-1].read_text(encoding="utf-8"))
     assert final_result["source_matches"][0]["preferred"] is True
     assert "official.example" in adapter.worker.prompts[-1]
+    assert all("done" not in prompt for prompt in adapter.worker.prompts)
+    snapshot = json.loads((run_dir / "dataset.jsonl").read_text(encoding="utf-8"))
+    assert snapshot == {"id": "q/1", "question": "What?"}
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["source_profile"]["id"] == "test-sources"
     assert (run_dir / "source-profile.yaml").exists()

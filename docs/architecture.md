@@ -139,3 +139,26 @@ can implement a recorded MCP search backend without changing runner contracts.
 
 `claude_code.py` and `codex.py` reserve the next extension points without
 pretending those integrations already exist.
+
+## Harness research
+
+The runner contract is `HarnessAdapter` / `HarnessWorker` in
+[`src/agentic_eval/harnesses/base.py`](../src/agentic_eval/harnesses/base.py).
+Adapters own native process lifecycle, permissions, sessions, events,
+cancellation, and answer extraction. Model endpoints and task prompts
+remain separate configuration objects.
+
+Comparable research notes, each using the same section order:
+
+- [OpenCode 1.18.21](harness-opencode.md): implemented adapter; most
+  model-portable of the three. Task `system_prompt` currently reaches
+  OpenCode as user-role text.
+- [Codex CLI](harness-codex.md): provider-pluggable, Responses-oriented,
+  not protocol-neutral. Reserved, not implemented.
+- [Claude Code](harness-claude-code.md): Claude-only proprietary loop.
+  Reserved as a Claude-specific baseline, not a shared adapter.
+
+Use those notes when designing a fourth, model-agnostic harness: keep
+native prompt layers, compaction, tool inventory, and permission
+semantics inside the adapter, and return only `AttemptResult` plus
+normalized `TraceEvent` values.

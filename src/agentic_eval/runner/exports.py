@@ -5,16 +5,29 @@ import json
 import os
 from pathlib import Path
 
+from agentic_eval.datasets import scoring_metadata
 from agentic_eval.runner.ledger import RunLedger
 from agentic_eval.scoring import keyword_scores
 
 
+def _metadata_dataset_path(run_dir: Path, manifest: dict[str, object]) -> Path | None:
+    source = manifest.get("dataset_source")
+    if isinstance(source, str) and source:
+        original = Path(source)
+        if original.is_file():
+            return original
+    snapshot = run_dir / "dataset.jsonl"
+    return snapshot if snapshot.is_file() else None
+
+
 def _case_metadata(run_dir: Path) -> dict[str, dict[str, object]]:
     manifest_path = run_dir / "manifest.json"
-    dataset_path = run_dir / "dataset.jsonl"
-    if not manifest_path.is_file() or not dataset_path.is_file():
+    if not manifest_path.is_file():
         return {}
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    dataset_path = _metadata_dataset_path(run_dir, manifest)
+    if dataset_path is None:
+        return {}
     dataset_spec = (manifest.get("resolved_config") or {}).get("dataset") or {}
     id_field = dataset_spec.get("id_field", "id")
     metadata_field = dataset_spec.get("metadata_field", "metadata")
@@ -24,8 +37,7 @@ def _case_metadata(run_dir: Path) -> dict[str, dict[str, object]]:
             if not line.strip():
                 continue
             record = json.loads(line)
-            metadata = record.get(metadata_field, {}) if metadata_field else {}
-            cases[str(record[id_field])] = metadata if isinstance(metadata, dict) else {}
+            cases[str(record[id_field])] = scoring_metadata(record, metadata_field)
     return cases
 
 
