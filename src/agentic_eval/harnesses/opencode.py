@@ -686,18 +686,24 @@ class OpenCodeAdapter:
                     case,
                     self.run_spec.task.render_qualification(),
                     1,
-                    min(self.run_spec.timeout_seconds, 120),
+                    self.run_spec.timeout_seconds,
                     capture,
                 )
                 if not attempt.successful:
                     raise RuntimeError(
                         f"OpenCode live qualification failed: {attempt.failure_kind}: {attempt.error}"
                     )
-                if not any(_is_tool_event(event) for event in events):
+                tools_allowed = bool(self.run_spec.harness.tool_policy.allow)
+                # Ablation w/o tools uses allow=[]; requiring a tool event would be wrong there.
+                if tools_allowed and not any(_is_tool_event(event) for event in events):
                     raise RuntimeError("Live qualification completed without an observable tool event")
-                if self.run_spec.environment.kind == "aneel_corpus" and not any(
-                    "aneel" in (_tool_name(event) or "").lower()
-                    for event in events
+                if (
+                    tools_allowed
+                    and self.run_spec.environment.kind == "aneel_corpus"
+                    and not any(
+                        "aneel" in (_tool_name(event) or "").lower()
+                        for event in events
+                    )
                 ):
                     raise RuntimeError(
                         "Corpus qualification completed without an observable ANEEL tool event"

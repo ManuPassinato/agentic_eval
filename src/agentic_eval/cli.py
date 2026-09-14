@@ -195,6 +195,10 @@ def export_command(
         raise typer.Exit(1) from exc
     typer.echo(f"Wrote {jsonl_path}")
     typer.echo(f"Wrote {csv_path}")
+    summary_path = run_dir / "exports" / "summary.json"
+    if summary_path.is_file():
+        typer.echo(f"Wrote {summary_path}")
+        typer.echo(summary_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

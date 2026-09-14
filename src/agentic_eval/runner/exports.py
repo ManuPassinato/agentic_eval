@@ -10,6 +10,11 @@ from agentic_eval.runner.ledger import RunLedger
 from agentic_eval.scoring import keyword_scores
 
 
+def _mean(records: list[dict[str, object]], key: str) -> float | None:
+    values = [value for record in records if isinstance((value := record.get(key)), (int, float))]
+    return sum(values) / len(values) if values else None
+
+
 def _metadata_dataset_path(run_dir: Path, manifest: dict[str, object]) -> Path | None:
     source = manifest.get("dataset_source")
     if isinstance(source, str) and source:
@@ -119,6 +124,10 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
         "progress_rate",
         "matched_key_answer",
         "matched_key_middle",
+        "retriever_score",
+        "tool_score",
+        "matched_retriever_anchors",
+        "matched_tool_keywords",
         "duration_seconds",
         "worker_id",
         "error",
@@ -145,7 +154,27 @@ def export_run(run_dir: Path) -> tuple[Path, Path]:
                     "matched_key_middle": json.dumps(
                         record["matched_key_middle"], ensure_ascii=False
                     ),
+                    "matched_retriever_anchors": json.dumps(
+                        record["matched_retriever_anchors"], ensure_ascii=False
+                    ),
+                    "matched_tool_keywords": json.dumps(
+                        record["matched_tool_keywords"], ensure_ascii=False
+                    ),
                 }
             )
     os.replace(csv_tmp, csv_path)
+
+    summary = {
+        "n_cases": len(records),
+        # Table 4.2: SR column is the with-tools success_rate.
+        "success_rate_mean": _mean(records, "success_rate"),
+        "progress_rate_mean": _mean(records, "progress_rate"),
+        "retriever_score_mean": _mean(records, "retriever_score"),
+        "tool_score_mean": _mean(records, "tool_score"),
+        "duration_seconds_mean": _mean(records, "duration_seconds"),
+    }
+    summary_path = export_dir / "summary.json"
+    summary_tmp = summary_path.with_suffix(".json.tmp")
+    summary_tmp.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    os.replace(summary_tmp, summary_path)
     return jsonl_path, csv_path

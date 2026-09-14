@@ -54,6 +54,8 @@ def scoring_metadata(record: dict[str, Any], metadata_field: str | None) -> dict
             if source in record:
                 metadata[dest] = record[source]
                 break
+    if "citations" in record and "citations" not in metadata:
+        metadata["citations"] = record["citations"]
     return metadata
 
 
