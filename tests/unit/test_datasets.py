@@ -82,16 +82,19 @@ def test_fused_answer_columns_are_not_loaded_or_rendered(tmp_path):
     assert scoring_metadata(record, spec.metadata_field) == {
         "key_answer": ["quinze dias"],
         "key_middle": ["ren2006247"],
+        "citations": [{"evidence_text": "SECRET EVIDENCE"}],
     }
     assert scoring_metadata(
         {
             "answer_keywords": [{"keyword": "quinze dias"}],
             "middle_keywords": [{"keyword": "ren2006247"}],
+            "citations": [{"blob_path": "legislacao/ren2006247.pdf"}],
         },
         None,
     ) == {
         "key_answer": [{"keyword": "quinze dias"}],
         "key_middle": [{"keyword": "ren2006247"}],
+        "citations": [{"blob_path": "legislacao/ren2006247.pdf"}],
     }
     assert "Como regularizar a fatura?" in prompt
     assert "SECRET GOLD ANSWER" not in prompt
