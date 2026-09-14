@@ -1,0 +1,50 @@
+name: ablation-wo-tools-public30
+
+dataset:
+  path: ../examples/benchmark.jsonl
+  id_field: task_id
+  question_field: question
+  reference_answer_field: null
+  tags_field: null
+  metadata_field: null
+  timeout_field: null
+
+model:
+  provider_id: vllm
+  model_id: ${VLLM_MODEL_ID:-Qwen/Qwen3.5-4B}
+  base_url: ${VLLM_BASE_URL:-http://127.0.0.1:18080/v1}
+  api_key: ${VLLM_API_KEY:-not-required}
+  context_limit: 32768
+  output_limit: 4096
+  request_timeout_seconds: 300
+  chunk_timeout_seconds: 90
+
+environment:
+  kind: web
+
+harness:
+  name: opencode
+  mode: managed
+  binary: ${OPENCODE_BIN:-opencode}
+  version: "1.18.21"
+  workers: 1
+  tool_policy:
+    allow: []
+    deny: [websearch, webfetch, bash, edit, write, read, glob, grep, aneel_*]
+
+task:
+  system_prompt: |
+    Responda em português usando apenas o seu conhecimento paramétrico.
+    É proibido chamar ferramentas, buscar na web ou inventar citações.
+    Dê a melhor resposta direta possível à pergunta regulatória.
+  question_template: |
+    Pergunta: {question}
+  qualification_system_prompt: |
+    Responda apenas com a palavra OK, sem ferramentas.
+  qualification_question: |
+    Responda exatamente: OK
+
+output_dir: ../runs
+concurrency: 1
+timeout_seconds: 180
+infrastructure_retries: 0
